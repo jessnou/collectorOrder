@@ -17,7 +17,7 @@ func GetOrders(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("ids")
 	IDs := convertStringToInt(idStr)
 	orders := getOrdersByID(IDs)
-	text := CreateMessageText(orders)
+	text := createMessageText(orders)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(text)
 
@@ -50,7 +50,7 @@ func getOrdersByID(IDs []int) map[string][]*models.OrderProductInfo {
 	return orderMap
 }
 
-func CreateMessageText(orders map[string][]*models.OrderProductInfo) map[string]string {
+func createMessageText(orders map[string][]*models.OrderProductInfo) map[string]string {
 	//Сортируем ключи,так как порядок элементов в map не гарантирован
 	keys := make([]string, 0, len(orders))
 	for key := range orders {
