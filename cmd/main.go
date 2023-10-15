@@ -1,9 +1,17 @@
 package main
 
-import "collectorOrder/internal/app"
+import (
+	"collectorOrder/internal/app"
+	"net/http"
+)
 
 func main() {
-	id, _ := app.ParseCommandLineArgs()
-	orders := app.Query(id)
-	app.CreateMessageCmd(orders)
+	fs := http.FileServer(http.Dir("./static"))
+
+	http.Handle("/", fs)
+
+	http.HandleFunc("/get", app.GetOrders)
+
+	_ = http.ListenAndServe(":8080", nil)
+
 }

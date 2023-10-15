@@ -4,50 +4,67 @@ import (
 	"collectorOrder/internal/db"
 	"collectorOrder/internal/db/models"
 	"collectorOrder/internal/db/query"
+	"encoding/json"
 	"fmt"
 	_ "github.com/lib/pq"
-	"log"
-	"os"
+	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 )
 
-func ParseCommandLineArgs() ([]int, error) {
-	args := os.Args[1:]
-	if len(args) == 0 {
-		log.Fatal("Нет переданных аргументов ")
-	}
-	delimiter := ","
-	argStr := strings.Join(args, " ")
-	argList := strings.Split(argStr, delimiter)
-	var numbers []int
-	for _, arg := range argList {
-		num, err := strconv.Atoi(arg)
-		if err != nil {
-			return nil, fmt.Errorf("Ошибка преобразования аргумента %s в число: %v\n", arg, err)
-		}
-		numbers = append(numbers, num)
-	}
-	return numbers, nil
+func GetOrders(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("ids")
+	IDs := convertStringToInt(idStr)
+	orders := getOrdersByID(IDs)
+	text := CreateMessageText(orders)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(text)
+
 }
 
-func Query(IDs []int) [][]*models.OrderProductInfo {
+func convertStringToInt(idStr string) []int {
+	idStr = strings.Trim(idStr, ",")
+
+	idSl := strings.Split(idStr, ",")
+	var result []int
+	for _, id := range idSl {
+		num, _ := strconv.Atoi(id)
+
+		result = append(result, num)
+	}
+	return result
+}
+func getOrdersByID(IDs []int) map[string][]*models.OrderProductInfo {
 	sqlDB, _ := db.GetDBConn()
 	defer sqlDB.Close()
-	var ordersS [][]*models.OrderProductInfo
-	for _, id := range IDs {
-		orders, _ := query.Get(sqlDB, id)
-		ordersS = append(ordersS, orders)
-	}
 
-	return ordersS
+	orderMap := make(map[string][]*models.OrderProductInfo)
+	// Проходимся по данным и добавляем их в карту
+	for _, id := range IDs {
+		orders, _ := query.GetOrders(sqlDB, id)
+		for _, order := range orders {
+			orderMap[order.ShelfName] = append(orderMap[order.ShelfName], order)
+		}
+	}
+	return orderMap
 }
 
-func CreateMessageCmd(orders [][]*models.OrderProductInfo) {
-	for _, order := range orders {
-		for _, ord := range order {
-			fmt.Println(ord)
-		}
-
+func CreateMessageText(orders map[string][]*models.OrderProductInfo) map[string]string {
+	//Сортируем ключи,так как порядок элементов в map не гарантирован
+	keys := make([]string, 0, len(orders))
+	for key := range orders {
+		keys = append(keys, key)
 	}
+	sort.Strings(keys)
+
+	var textMap = make(map[string]string)
+	// Итерируем по отсортированным ключам
+	for _, key := range keys {
+		for _, ord := range orders[key] {
+			textMap[fmt.Sprintf("Стеллаж %s", key)] += fmt.Sprintf("%s (id=%d) заказ %d, %d шт ",
+				ord.ProductName, ord.ProductID, ord.OrderID, ord.Quantity)
+		}
+	}
+	return textMap
 }
