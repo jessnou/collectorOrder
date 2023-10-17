@@ -19,9 +19,9 @@ CREATE TABLE products (
 
 -- Таблица для связи продуктов и стеллажей
 CREATE TABLE product_shelf (
-    product_shelf_id serial primary key,
     product_id INT,
     shelf_id INT,
+    main_shelf BOOLEAN,
     FOREIGN KEY (product_id) REFERENCES products(product_id),
     FOREIGN KEY (shelf_id) REFERENCES shelves(shelf_id)
 );
@@ -73,16 +73,16 @@ INSERT INTO orders (customer_name, order_date) VALUES
     ('Андрей Кузнецов', '2023-10-18'),
     ('Татьяна Павлова', '2023-10-19');
 
-INSERT INTO product_shelf (product_id, shelf_id) VALUES
-    (1, 1),
-    (2, 1),
-    (3, 2),
-    (3, 3),
-    (3, 8),
-    (4, 7),
-    (5, 7),
-    (5, 1),
-    (6,7);
+INSERT INTO product_shelf (product_id, shelf_id,main_shelf) VALUES
+    (1, 1,true),
+    (2, 1,true),
+    (3, 2,true),
+    (3, 3,false),
+    (3, 8,false),
+    (4, 7,true),
+    (5, 7,true),
+    (5, 1,false),
+    (6,7,true);
 
 INSERT INTO products_orders (order_id, product_id, quantity) VALUES
     (10, 1,2),

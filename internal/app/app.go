@@ -35,22 +35,41 @@ func ParseCommandLineArgs() ([]int, error) {
 func GetOrdersByID(IDs []int) map[string][]*models.OrderProductInfo {
 	sqlDB, _ := db.GetDBConn()
 	defer sqlDB.Close()
-
 	orderMap := make(map[string][]*models.OrderProductInfo)
-	// Проходимся по данным и добавляем их в карту
+
 	for _, id := range IDs {
 		orders, _ := query.GetOrders(sqlDB, id)
+		for _, ord := range orders {
 
-		for i, order := range orders {
-			if i >= 1 && orders[i].ProductName == orders[i-1].ProductName {
-				continue
+			products, _ := query.GetProductShelf(sqlDB, ord.ProductID)
+			var otherShelves []string
+			for _, pr := range products {
+
+				if !pr.MainShelf {
+					shelf, _ := query.GetShelf(sqlDB, pr.ShelfId)
+
+					otherShelves = append(otherShelves, shelf.ShelfName)
+
+				}
 			}
-			orderMap[order.ShelfName] = append(orderMap[order.ShelfName], order)
+			for _, pr := range products {
+
+				if pr.MainShelf {
+					shelf, _ := query.GetShelf(sqlDB, pr.ShelfId)
+					orderMap[shelf.ShelfName] = append(orderMap[shelf.ShelfName], &models.OrderProductInfo{
+						OrderID:     ord.OrderID,
+						ProductName: pr.ProductName,
+						ProductID:   pr.ProductId,
+						Quantity:    ord.Quantity,
+						OtherShelf:  otherShelves,
+					})
+				}
+			}
 		}
 	}
+
 	return orderMap
 }
-
 func CreateMessageCmd(orders map[string][]*models.OrderProductInfo) string {
 	sqlDB, _ := db.GetDBConn()
 	defer sqlDB.Close()
@@ -69,18 +88,17 @@ func CreateMessageCmd(orders map[string][]*models.OrderProductInfo) string {
 		for _, ord := range orders[key] {
 			text += fmt.Sprintf("%s (id=%d)\nзаказ %d, %d шт",
 				ord.ProductName, ord.ProductID, ord.OrderID, ord.Quantity)
-			shelves, _ := query.GetShelves(sqlDB, ord.ProductID)
-			//в случае если продукт находится на нескольких стеллажах
-			if len(shelves) == 1 {
+			////в случае если продукт находится на нескольких стеллажах
+			if ord.OtherShelf == nil {
 				text += "\n \n"
 			} else {
 				var shelvesText string
-				for _, shelve := range shelves {
-					if shelve.ShelfName != ord.ShelfName {
-						shelvesText += fmt.Sprintf(" %s", shelve.ShelfName)
-					}
+				for _, shelve := range ord.OtherShelf {
+
+					shelvesText += fmt.Sprintf(" %s", shelve)
+
 				}
-				text += fmt.Sprintf("\nДоп стелаж%s \n\n", shelvesText)
+				text += fmt.Sprintf("\nДоп стеллаж%s \n\n", shelvesText)
 
 			}
 		}

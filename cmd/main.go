@@ -11,11 +11,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	m := app.GetOrdersByID(numbers)
 
-	orders := app.GetOrdersByID(numbers)
-
-	input := app.CreateMessageCmd(orders)
-
-	fmt.Println(input)
+	text := app.CreateMessageCmd(m)
+	fmt.Println(text)
 
 }
