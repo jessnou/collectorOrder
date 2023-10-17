@@ -3,16 +3,16 @@ package main
 import (
 	"collectorOrder/internal/app"
 	"fmt"
+	"log"
 )
 
 func main() {
-	//numbers, err := app.ParseCommandLineArgs()
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	var ids = []int{10, 11, 14, 15}
+	numbers, err := app.ParseCommandLineArgs()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	orders := app.GetOrdersByID(ids)
+	orders := app.GetOrdersByID(numbers)
 
 	input := app.CreateMessageCmd(orders)
 
