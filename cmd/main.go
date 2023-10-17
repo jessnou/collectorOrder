@@ -2,16 +2,20 @@ package main
 
 import (
 	"collectorOrder/internal/app"
-	"net/http"
+	"fmt"
 )
 
 func main() {
-	fs := http.FileServer(http.Dir("./static"))
+	//numbers, err := app.ParseCommandLineArgs()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	var ids = []int{10, 11, 14, 15}
 
-	http.Handle("/", fs)
+	orders := app.GetOrdersByID(ids)
 
-	http.HandleFunc("/get", app.GetOrders)
+	input := app.CreateMessageCmd(orders)
 
-	_ = http.ListenAndServe(":8080", nil)
+	fmt.Println(input)
 
 }

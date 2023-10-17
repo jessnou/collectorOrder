@@ -4,38 +4,35 @@ import (
 	"collectorOrder/internal/db"
 	"collectorOrder/internal/db/models"
 	"collectorOrder/internal/db/query"
-	"encoding/json"
 	"fmt"
 	_ "github.com/lib/pq"
-	"net/http"
+	"log"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-func GetOrders(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("ids")
-	IDs := convertStringToInt(idStr)
-	orders := getOrdersByID(IDs)
-	text := createMessageText(orders)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(text)
-
-}
-
-func convertStringToInt(idStr string) []int {
-	idStr = strings.Trim(idStr, ",")
-
-	idSl := strings.Split(idStr, ",")
-	var result []int
-	for _, id := range idSl {
-		num, _ := strconv.Atoi(id)
-
-		result = append(result, num)
+func ParseCommandLineArgs() ([]int, error) {
+	args := os.Args[1:]
+	if len(args) == 0 {
+		log.Fatal("Нет переданных аргументов ")
 	}
-	return result
+	delimiter := ","
+	argStr := strings.Join(args, " ")
+	argList := strings.Split(argStr, delimiter)
+	var numbers []int
+	for _, arg := range argList {
+		num, err := strconv.Atoi(arg)
+		if err != nil {
+			return nil, fmt.Errorf("Ошибка преобразования аргумента %s в число: %v\n", arg, err)
+		}
+		numbers = append(numbers, num)
+	}
+	return numbers, nil
 }
-func getOrdersByID(IDs []int) map[string][]*models.OrderProductInfo {
+
+func GetOrdersByID(IDs []int) map[string][]*models.OrderProductInfo {
 	sqlDB, _ := db.GetDBConn()
 	defer sqlDB.Close()
 
@@ -54,7 +51,7 @@ func getOrdersByID(IDs []int) map[string][]*models.OrderProductInfo {
 	return orderMap
 }
 
-func createMessageText(orders map[string][]*models.OrderProductInfo) map[string]string {
+func CreateMessageCmd(orders map[string][]*models.OrderProductInfo) string {
 	sqlDB, _ := db.GetDBConn()
 	defer sqlDB.Close()
 
@@ -65,30 +62,28 @@ func createMessageText(orders map[string][]*models.OrderProductInfo) map[string]
 	}
 	sort.Strings(keys)
 
-	var textMap = make(map[string]string)
-
+	var text string
 	// Итерируем по отсортированным ключам
 	for _, key := range keys {
+		text += fmt.Sprintf("===Стеллаж %s \n", key)
 		for _, ord := range orders[key] {
-
-			textMap[fmt.Sprintf("Стеллаж %s", key)] += fmt.Sprintf("%s (id=%d) заказ %d, %d шт ",
+			text += fmt.Sprintf("%s (id=%d)\nзаказ %d, %d шт",
 				ord.ProductName, ord.ProductID, ord.OrderID, ord.Quantity)
 			shelves, _ := query.GetShelves(sqlDB, ord.ProductID)
 			//в случае если продукт находится на нескольких стеллажах
-			if len(shelves) > 1 {
-				var text string
+			if len(shelves) == 1 {
+				text += "\n \n"
+			} else {
+				var shelvesText string
 				for _, shelve := range shelves {
 					if shelve.ShelfName != ord.ShelfName {
-						text += fmt.Sprintf(" %s", shelve.ShelfName)
+						shelvesText += fmt.Sprintf(" %s", shelve.ShelfName)
 					}
 				}
-				textMap[fmt.Sprintf("Стеллаж %s", key)] += fmt.Sprintf("Доп стелаж%s", text)
+				text += fmt.Sprintf("\nДоп стелаж%s \n\n", shelvesText)
+
 			}
 		}
 	}
-	return textMap
-}
-
-func getShelvesByID() {
-
+	return text
 }
