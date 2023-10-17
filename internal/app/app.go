@@ -9,60 +9,67 @@ import (
 	"log"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 )
 
-func ParseCommandLineArgs() ([]int, error) {
+func ParseCommandLineArgs() (string, error) {
 	args := os.Args[1:]
 	if len(args) == 0 {
 		log.Fatal("Нет переданных аргументов ")
 	}
-	delimiter := ","
-	argStr := strings.Join(args, " ")
-	argList := strings.Split(argStr, delimiter)
-	var numbers []int
-	for _, arg := range argList {
-		num, err := strconv.Atoi(arg)
-		if err != nil {
-			return nil, fmt.Errorf("Ошибка преобразования аргумента %s в число: %v\n", arg, err)
-		}
-		numbers = append(numbers, num)
-	}
-	return numbers, nil
+
+	result := convertToString(args)
+	return result, nil
 }
 
-func GetOrdersByID(IDs []int) map[string][]*models.OrderProductInfo {
+func GetOrdersShelvesProducts(ids string) ([]*models.Shelves, []*models.ProductShelf, []*models.OrderProduct) {
 	sqlDB, _ := db.GetDBConn()
 	defer sqlDB.Close()
+	var productIdsInt []int
+	var shelvesIdsInt []int
+
+	orders, _ := query.GetOrders(sqlDB, ids)
+	for _, ord := range orders {
+		productIdsInt = append(productIdsInt, ord.ProductID)
+	}
+
+	productIds := convertIntToString(productIdsInt)
+	products, _ := query.GetProductShelf(sqlDB, productIds)
+	for _, pr := range products {
+		shelvesIdsInt = append(shelvesIdsInt, pr.ShelfId)
+	}
+
+	shelvesIds := convertIntToString(shelvesIdsInt)
+	shelves, _ := query.GetShelves(sqlDB, shelvesIds)
+	return shelves, products, orders
+}
+
+func CreateMap(shelves []*models.Shelves, products []*models.ProductShelf,
+	orders []*models.OrderProduct) map[string][]*models.OrderProductInfo {
 	orderMap := make(map[string][]*models.OrderProductInfo)
-
-	for _, id := range IDs {
-		orders, _ := query.GetOrders(sqlDB, id)
-		for _, ord := range orders {
-
-			products, _ := query.GetProductShelf(sqlDB, ord.ProductID)
-			var otherShelves []string
-			for _, pr := range products {
-
-				if !pr.MainShelf {
-					shelf, _ := query.GetShelf(sqlDB, pr.ShelfId)
-
-					otherShelves = append(otherShelves, shelf.ShelfName)
-
-				}
+	otherShelves := make(map[int][]*string)
+	for _, s := range shelves {
+		for _, pr := range products {
+			if pr.ShelfId == s.ShelveID && !pr.MainShelf {
+				otherShelves[pr.ProductId] = append(otherShelves[pr.ProductId], &s.ShelfName)
 			}
-			for _, pr := range products {
+		}
+	}
 
-				if pr.MainShelf {
-					shelf, _ := query.GetShelf(sqlDB, pr.ShelfId)
-					orderMap[shelf.ShelfName] = append(orderMap[shelf.ShelfName], &models.OrderProductInfo{
+	for _, ord := range orders {
+
+		for _, s := range shelves {
+
+			for _, pr := range products {
+				if pr.ShelfId == s.ShelveID && ord.ProductID == pr.ProductId && pr.MainShelf {
+					orderMap[s.ShelfName] = append(orderMap[s.ShelfName], &models.OrderProductInfo{
 						OrderID:     ord.OrderID,
 						ProductName: pr.ProductName,
 						ProductID:   pr.ProductId,
 						Quantity:    ord.Quantity,
-						OtherShelf:  otherShelves,
+						OtherShelf:  otherShelves[pr.ProductId],
 					})
+
 				}
 			}
 		}
@@ -70,7 +77,8 @@ func GetOrdersByID(IDs []int) map[string][]*models.OrderProductInfo {
 
 	return orderMap
 }
-func CreateMessageCmd(orders map[string][]*models.OrderProductInfo) string {
+
+func CreateMessageCmd(orders map[string][]*models.OrderProductInfo) {
 	sqlDB, _ := db.GetDBConn()
 	defer sqlDB.Close()
 
@@ -88,20 +96,34 @@ func CreateMessageCmd(orders map[string][]*models.OrderProductInfo) string {
 		for _, ord := range orders[key] {
 			text += fmt.Sprintf("%s (id=%d)\nзаказ %d, %d шт",
 				ord.ProductName, ord.ProductID, ord.OrderID, ord.Quantity)
-			////в случае если продукт находится на нескольких стеллажах
+			//в случае если продукт находится на нескольких стеллажах
 			if ord.OtherShelf == nil {
 				text += "\n \n"
 			} else {
 				var shelvesText string
 				for _, shelve := range ord.OtherShelf {
 
-					shelvesText += fmt.Sprintf(" %s", shelve)
+					shelvesText += fmt.Sprintf(" %s", *shelve)
 
 				}
 				text += fmt.Sprintf("\nДоп стеллаж%s \n\n", shelvesText)
 
 			}
+
 		}
 	}
-	return text
+	fmt.Println(text)
+}
+
+func convertToString(args []string) string {
+	result := fmt.Sprintf("(%s)", strings.Join(args, ","))
+	return result
+}
+func convertIntToString(numbers []int) string {
+	stringNumbers := make([]string, len(numbers))
+	for i, num := range numbers {
+		stringNumbers[i] = fmt.Sprint(num)
+	}
+	result := convertToString(stringNumbers)
+	return result
 }

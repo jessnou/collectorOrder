@@ -2,7 +2,6 @@ package main
 
 import (
 	"collectorOrder/internal/app"
-	"fmt"
 	"log"
 )
 
@@ -11,9 +10,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	m := app.GetOrdersByID(numbers)
-
-	text := app.CreateMessageCmd(m)
-	fmt.Println(text)
+	o, s, p := app.GetOrdersShelvesProducts(numbers)
+	m := app.CreateMap(o, s, p)
+	app.CreateMessageCmd(m)
 
 }

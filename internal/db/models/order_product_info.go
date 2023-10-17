@@ -5,5 +5,5 @@ type OrderProductInfo struct {
 	ProductName string
 	ProductID   int
 	Quantity    int
-	OtherShelf  []string
+	OtherShelf  []*string
 }
