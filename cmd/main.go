@@ -2,16 +2,16 @@ package main
 
 import (
 	"collectorOrder/internal/app"
-	"log"
 )
 
 func main() {
-	numbers, err := app.ParseCommandLineArgs()
-	if err != nil {
-		log.Fatal(err)
-	}
-	o, s, p := app.GetOrdersShelvesProducts(numbers)
-	m := app.CreateMap(o, s, p)
-	app.CreateMessageCmd(m)
+	//numbers, err := app.ParseCommandLineArgs()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	ids := "10,11,14,15"
+	_, _, _, _, _, _ = app.GetOrdersShelvesProducts(ids)
+
+	//app.CreateMessageCmd(m)
 
 }
