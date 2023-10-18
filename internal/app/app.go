@@ -22,7 +22,7 @@ func ParseCommandLineArgs() (string, error) {
 	return result, nil
 }
 
-func GetOrdersShelvesProducts(ids string) ([]*models.Shelves, []*models.ProductShelf, []*models.OrderProduct) {
+func GetOrdersShelvesProducts(ids string) ([]models.Shelves, []models.ProductShelf, []models.OrderProduct) {
 	sqlDB, _ := db.GetDBConn()
 	defer sqlDB.Close()
 	var productIdsInt []int
