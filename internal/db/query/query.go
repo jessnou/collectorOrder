@@ -3,23 +3,19 @@ package query
 import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
-	"strconv"
-	"strings"
+	"log"
 )
 
-func GetOrderProducts(db *sqlx.DB, orderIds string) error {
+func GetOrderProducts(db *sqlx.DB, orderIds string) (map[string]string, string) {
 	//orderMap := make(map[int][]*models.OrderProduct)
 	var productIds string
 	orderProductMap := make(map[string]string)
-	m := make(map[string]int)
-
-	//orderProductInfo := make(map[string]string)
 
 	query := `SELECT order_id, product_id, quantity FROM products_orders WHERE order_id IN (` + orderIds + `)`
 
 	rows, err := db.Queryx(query)
 	if err != nil {
-		return fmt.Errorf("failed to get orders: %v", err)
+		log.Fatalf("failed to get orders: %v", err)
 	}
 	defer rows.Close()
 
@@ -28,27 +24,29 @@ func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 		var productID int
 		var quantity int
 		if err = rows.Scan(&orderID, &productID, &quantity); err != nil {
-			return fmt.Errorf("failed to scan row: %v", err)
+			log.Fatalf("failed to scan row: %v", err)
 		}
 		if productIds == "" {
 			productIds += fmt.Sprintf("%d", productID)
 		} else {
 			productIds += fmt.Sprintf(",%d", productID)
 		}
-		orderProductMap[fmt.Sprintf("%d,%d", orderID, productID)] = fmt.Sprintf("(id=%d)\n\n Заказ %d, %d шт", productID, orderID, quantity)
-		m[fmt.Sprintf("%d,%d", productID, quantity)] = orderID
+		orderProductMap[fmt.Sprintf("%d,%d", orderID, productID)] = fmt.Sprintf("(id=%d)\nЗаказ %d, %d шт", productID, orderID, quantity)
+
 	}
 
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error in rows: %v", err)
+		log.Fatalf("error in rows: %v", err)
 	}
-
+	return orderProductMap, productIds
+}
+func GetProductMap(db *sqlx.DB, productIds string) map[int]string {
 	productMap := make(map[int]string)
-	query = `SELECT * FROM products  WHERE product_id IN (` + productIds + `)`
+	query := `SELECT * FROM products  WHERE product_id IN (` + productIds + `)`
 
-	rows, err = db.Queryx(query)
+	rows, err := db.Queryx(query)
 	if err != nil {
-		return fmt.Errorf("failed to get products: %v", err)
+		log.Fatalf("failed to get products: %v", err)
 	}
 	defer rows.Close()
 
@@ -56,18 +54,24 @@ func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 		var productID int
 		var productName string
 		if err = rows.Scan(&productID, &productName); err != nil {
-			return fmt.Errorf("failed to scan row: %v", err)
+			log.Fatalf("failed to scan row: %v", err)
 		}
 		productMap[productID] = productName
 	}
+	if err = rows.Err(); err != nil {
+		log.Fatalf("error in rows: %v", err)
+	}
+	return productMap
+}
+func GetProductShelvesMaps(db *sqlx.DB, productIds string) (map[int]int, map[int]string, string) {
 	var shelvesIds string
 	mainShelfMap := make(map[int]int)
 	otherShelfMap := make(map[int]string)
-	query = `SELECT * FROM product_shelf  WHERE product_id IN (` + productIds + `)`
+	query := `SELECT * FROM product_shelf  WHERE product_id IN (` + productIds + `)`
 
-	rows, err = db.Queryx(query)
+	rows, err := db.Queryx(query)
 	if err != nil {
-		return fmt.Errorf("failed to get product shelf: %v", err)
+		log.Fatalf("failed to get product shelf: %v", err)
 	}
 	defer rows.Close()
 
@@ -76,7 +80,7 @@ func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 		var shelfId int
 		var mainShelf bool
 		if err = rows.Scan(&productId, &shelfId, &mainShelf); err != nil {
-			return fmt.Errorf("failed to scan row: %v", err)
+			log.Fatalf("failed to scan row: %v", err)
 		}
 		if shelvesIds == "" {
 			shelvesIds += fmt.Sprintf("%d", shelfId)
@@ -97,19 +101,18 @@ func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 	}
 
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error in rows: %v", err)
+		log.Fatalf("error in rows: %v", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error in rows: %v", err)
-	}
-
+	return mainShelfMap, otherShelfMap, shelvesIds
+}
+func GetShelvesMap(db *sqlx.DB, shelvesIds string) map[int]string {
 	shelvesMap := make(map[int]string)
-	query = `SELECT * FROM shelves  WHERE shelves.shelf_id IN (` + shelvesIds + `)`
+	query := `SELECT * FROM shelves  WHERE shelves.shelf_id IN (` + shelvesIds + `)`
 
-	rows, err = db.Queryx(query)
+	rows, err := db.Queryx(query)
 	if err != nil {
-		return fmt.Errorf("failed to get shelves: %v", err)
+		log.Fatalf("failed to get shelves: %v", err)
 	}
 	defer rows.Close()
 
@@ -117,85 +120,13 @@ func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 		var shelveID int
 		var shelfName string
 		if err = rows.Scan(&shelveID, &shelfName); err != nil {
-			return fmt.Errorf("failed to scan row: %v", err)
+			log.Fatalf("failed to scan row: %v", err)
 		}
 		shelvesMap[shelveID] = shelfName
 	}
 
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error in rows: %v", err)
+		log.Fatalf("error in rows: %v", err)
 	}
-	otherShelvesName := make(map[int]string)
-	for key := range otherShelfMap {
-		idStrM := strings.Split(otherShelfMap[key], ",")
-		var idsM []int
-		for _, idM := range idStrM {
-			idM, err := strconv.Atoi(idM)
-			if err != nil {
-				fmt.Print("Ошибка преобзарвания строку в число")
-			}
-			idsM = append(idsM, idM)
-		}
-		for _, id := range idsM {
-
-			otherShelvesName[key] += shelvesMap[id]
-		}
-
-	}
-	idStrProd := strings.Split(productIds, ",")
-	idStrOrder := strings.Split(orderIds, ",")
-	var idsPr []int
-	var idsOrd []int
-	for _, idStrO := range idStrOrder {
-		id, err := strconv.Atoi(idStrO)
-		if err != nil {
-			fmt.Print("Ошибка преобзарвания строку в число")
-		}
-		idsOrd = append(idsOrd, id)
-	}
-
-	for _, idStrP := range idStrProd {
-		id, err := strconv.Atoi(idStrP)
-		if err != nil {
-			fmt.Print("Ошибка преобзарвания строку в число")
-		}
-		idsPr = append(idsPr, id)
-	}
-	text := make(map[string]string)
-	//var text2 string
-	for _, idPr := range idsPr {
-		//if !strings.Contains(text2, fmt.Sprintf("Стеллаж %s\n\n", shelvesMap[mainShelfMap[idPr]])) {
-		//	text2 += fmt.Sprintf("Стеллаж %s\n\n", shelvesMap[mainShelfMap[idPr]])
-		//}
-
-		for _, idOrd := range idsOrd {
-			if _, exists := orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)]; exists {
-				if _, exists = text[shelvesMap[mainShelfMap[idPr]]]; !exists {
-					text[shelvesMap[mainShelfMap[idPr]]] = ""
-				}
-				//if strings.Contains(text2, fmt.Sprintf("%s %s", productMap[idPr], orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)])) {
-				//	continue
-				//}
-				if strings.Contains(text[shelvesMap[mainShelfMap[idPr]]], fmt.Sprintf("%s %s", productMap[idPr], orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)])) {
-					continue
-				}
-				//text2 += fmt.Sprintf("%s %s", productMap[idPr], orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)])
-				text[shelvesMap[mainShelfMap[idPr]]] += fmt.Sprintf("%s %s", productMap[idPr], orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)])
-				if _, ok := otherShelfMap[idPr]; ok {
-					text[shelvesMap[mainShelfMap[idPr]]] += fmt.Sprintf("\nДоп стеллаж %s\n\n", otherShelvesName[idPr])
-					//text2 += fmt.Sprintf("Доп стеллаж %s", otherShelvesName[idPr])
-				} else {
-					text[shelvesMap[mainShelfMap[idPr]]] += "\n\n"
-				}
-			}
-		}
-
-	}
-
-	for key := range text {
-		fmt.Printf("Стеллаж %s \n\n %s", key, text[key])
-	}
-
-	return nil
-
+	return shelvesMap
 }
