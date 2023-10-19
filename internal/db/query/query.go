@@ -10,8 +10,9 @@ import (
 func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 	//orderMap := make(map[int][]*models.OrderProduct)
 	var productIds string
+	orderProductMap := make(map[string]string)
+	m := make(map[string]int)
 
-	orderProductMap := make(map[int]string)
 	//orderProductInfo := make(map[string]string)
 
 	query := `SELECT order_id, product_id, quantity FROM products_orders WHERE order_id IN (` + orderIds + `)`
@@ -34,8 +35,8 @@ func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 		} else {
 			productIds += fmt.Sprintf(",%d", productID)
 		}
-		orderProductMap[productID] += fmt.Sprintf("(id=%d) Заказ %d, %d шт", productID, orderID, quantity)
-
+		orderProductMap[fmt.Sprintf("%d,%d", orderID, productID)] = fmt.Sprintf("(id=%d) Заказ %d, %d шт", productID, orderID, quantity)
+		m[fmt.Sprintf("%d,%d", productID, quantity)] = orderID
 	}
 
 	if err = rows.Err(); err != nil {
@@ -85,7 +86,7 @@ func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 		if mainShelf {
 			mainShelfMap[productId] = shelfId
 		} else {
-			if _, exists := otherShelfMap[productId]; exists {
+			if _, exists := otherShelfMap[productId]; !exists {
 				otherShelfMap[productId] += fmt.Sprintf("%d", shelfId)
 			} else {
 				otherShelfMap[productId] += fmt.Sprintf(",%d", shelfId)
@@ -124,25 +125,63 @@ func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("error in rows: %v", err)
 	}
-	idStrs := strings.Split(productIds, ",")
-	var ids []int
-	for _, idStr := range idStrs {
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			fmt.Print("Ошикбка преобзарвания строку в число")
+	otherShelvesName := make(map[int]string)
+	for key := range otherShelfMap {
+		idStrM := strings.Split(otherShelfMap[key], ",")
+		var idsM []int
+		for _, idM := range idStrM {
+			idM, err := strconv.Atoi(idM)
+			if err != nil {
+				fmt.Print("Ошибка преобзарвания строку в число")
+			}
+			idsM = append(idsM, idM)
 		}
-		ids = append(ids, id)
+		for _, id := range idsM {
+
+			otherShelvesName[key] += shelvesMap[id]
+		}
+
+	}
+	idStrProd := strings.Split(productIds, ",")
+	idStrOrder := strings.Split(orderIds, ",")
+	var idsPr []int
+	var idsOrd []int
+	for _, idStrO := range idStrOrder {
+		id, err := strconv.Atoi(idStrO)
+		if err != nil {
+			fmt.Print("Ошибка преобзарвания строку в число")
+		}
+		idsOrd = append(idsOrd, id)
+	}
+
+	for _, idStrP := range idStrProd {
+		id, err := strconv.Atoi(idStrP)
+		if err != nil {
+			fmt.Print("Ошибка преобзарвания строку в число")
+		}
+		idsPr = append(idsPr, id)
 	}
 	text := make(map[string]string)
-	for _, id := range ids {
 
-		if _, exists := text[shelvesMap[mainShelfMap[id]]]; exists {
-			text[shelvesMap[mainShelfMap[id]]] += fmt.Sprintf("%d", shelfId)
-		} else {
-			otherShelfMap[productId] += fmt.Sprintf(",%d", shelfId)
+	for _, idPr := range idsPr {
+		for _, idOrd := range idsOrd {
+			if _, exists := orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)]; exists {
+				if _, exists = text[shelvesMap[mainShelfMap[idPr]]]; !exists {
+					text[shelvesMap[mainShelfMap[idPr]]] = ""
+				}
+				if strings.Contains(text[shelvesMap[mainShelfMap[idPr]]], fmt.Sprintf("%s %s", productMap[idPr], orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)])) {
+					continue
+				}
+				text[shelvesMap[mainShelfMap[idPr]]] += fmt.Sprintf("%s %s", productMap[idPr], orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)])
+				if _, ok := otherShelfMap[idPr]; ok {
+					text[shelvesMap[mainShelfMap[idPr]]] += fmt.Sprintf("Доп стеллаж %s", otherShelvesName[idPr])
+				}
+			}
 		}
-		fmt.Println(shelvesMap[mainShelfMap[id]] + orderProductMap[id])
+
 	}
+
+	fmt.Println(text)
 	return nil
 
 }
