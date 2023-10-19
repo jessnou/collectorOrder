@@ -35,7 +35,7 @@ func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 		} else {
 			productIds += fmt.Sprintf(",%d", productID)
 		}
-		orderProductMap[fmt.Sprintf("%d,%d", orderID, productID)] = fmt.Sprintf("(id=%d) Заказ %d, %d шт", productID, orderID, quantity)
+		orderProductMap[fmt.Sprintf("%d,%d", orderID, productID)] = fmt.Sprintf("(id=%d)\n\n Заказ %d, %d шт", productID, orderID, quantity)
 		m[fmt.Sprintf("%d,%d", productID, quantity)] = orderID
 	}
 
@@ -162,26 +162,40 @@ func GetOrderProducts(db *sqlx.DB, orderIds string) error {
 		idsPr = append(idsPr, id)
 	}
 	text := make(map[string]string)
-
+	//var text2 string
 	for _, idPr := range idsPr {
+		//if !strings.Contains(text2, fmt.Sprintf("Стеллаж %s\n\n", shelvesMap[mainShelfMap[idPr]])) {
+		//	text2 += fmt.Sprintf("Стеллаж %s\n\n", shelvesMap[mainShelfMap[idPr]])
+		//}
+
 		for _, idOrd := range idsOrd {
 			if _, exists := orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)]; exists {
 				if _, exists = text[shelvesMap[mainShelfMap[idPr]]]; !exists {
 					text[shelvesMap[mainShelfMap[idPr]]] = ""
 				}
+				//if strings.Contains(text2, fmt.Sprintf("%s %s", productMap[idPr], orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)])) {
+				//	continue
+				//}
 				if strings.Contains(text[shelvesMap[mainShelfMap[idPr]]], fmt.Sprintf("%s %s", productMap[idPr], orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)])) {
 					continue
 				}
+				//text2 += fmt.Sprintf("%s %s", productMap[idPr], orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)])
 				text[shelvesMap[mainShelfMap[idPr]]] += fmt.Sprintf("%s %s", productMap[idPr], orderProductMap[fmt.Sprintf("%d,%d", idOrd, idPr)])
 				if _, ok := otherShelfMap[idPr]; ok {
-					text[shelvesMap[mainShelfMap[idPr]]] += fmt.Sprintf("Доп стеллаж %s", otherShelvesName[idPr])
+					text[shelvesMap[mainShelfMap[idPr]]] += fmt.Sprintf("\nДоп стеллаж %s\n\n", otherShelvesName[idPr])
+					//text2 += fmt.Sprintf("Доп стеллаж %s", otherShelvesName[idPr])
+				} else {
+					text[shelvesMap[mainShelfMap[idPr]]] += "\n\n"
 				}
 			}
 		}
 
 	}
 
-	fmt.Println(text)
+	for key := range text {
+		fmt.Printf("Стеллаж %s \n\n %s", key, text[key])
+	}
+
 	return nil
 
 }
