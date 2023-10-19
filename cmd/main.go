@@ -1,7 +1,9 @@
 package main
 
 import (
-	"collectorOrder/internal/app"
+	"collectorOrder/internal/db"
+	"collectorOrder/internal/db/query"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -9,9 +11,10 @@ func main() {
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
+	sqlDB, _ := db.GetDBConn()
+	defer sqlDB.Close()
 	ids := "10,11,14,15"
-	_, _, _, _, _, _ = app.GetOrdersShelvesProducts(ids)
-
+	_ = query.GetOrderProducts(sqlDB, ids)
 	//app.CreateMessageCmd(m)
 
 }
