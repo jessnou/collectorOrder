@@ -7,7 +7,10 @@ import (
 )
 
 func GetOrderProducts(db *sqlx.DB, ids string) (map[int][]*models.OrderProduct, error) {
-	orderMap := make(map[int][]*models.OrderProduct)
+	//orderMap := make(map[int][]*models.OrderProduct)
+	var orderIds string
+	//orderProductMap := make(map[int]string)
+	//orderProductInfo := make(map[string]string)
 
 	query := `SELECT order_id, product_id, quantity FROM products_orders WHERE order_id IN (` + ids + `)`
 
@@ -22,24 +25,23 @@ func GetOrderProducts(db *sqlx.DB, ids string) (map[int][]*models.OrderProduct, 
 		if err = rows.Scan(&order.OrderID, &order.ProductID, &order.Quantity); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %v", err)
 		}
-		if _, exists := orderMap[order.ProductID]; !exists {
-			orderMap[order.ProductID] = []*models.OrderProduct{}
+		if rows.NextResultSet() {
+			orderIds += fmt.Sprintf("%d", order.OrderID)
+		} else {
+			orderIds += fmt.Sprintf("%d,", order.OrderID)
 		}
-		orderMap[order.ProductID] = append(orderMap[order.ProductID], &order)
+
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error in rows: %v", err)
 	}
 
-	return orderMap, nil
-}
+	mainShelfMap := make(map[int]string)
+	otherShelfMap := make(map[int]string)
+	query = `SELECT * FROM product_shelf  WHERE product_id IN (` + orderIds + `)`
 
-func GetProductShelf(db *sqlx.DB, ids string) (map[int][]*models.ProductShelf, error) {
-	productShelfMap := make(map[int][]*models.ProductShelf)
-	query := `SELECT * FROM product_shelf  WHERE product_id IN (` + ids + `)`
-
-	rows, err := db.Queryx(query)
+	rows, err = db.Queryx(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product shelf: %v", err)
 	}
@@ -50,20 +52,19 @@ func GetProductShelf(db *sqlx.DB, ids string) (map[int][]*models.ProductShelf, e
 		if err = rows.Scan(&productShelf.ProductId, &productShelf.ShelfId, &productShelf.MainShelf); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %v", err)
 		}
-
-		if _, exists := productShelfMap[productShelf.ShelfId]; !exists {
-			productShelfMap[productShelf.ShelfId] = []*models.ProductShelf{}
+		if productShelf.MainShelf {
+			mainShelfMap[productShelf.ProductId] = fmt.Sprintf("%d", productShelf.ShelfId)
+		} else {
+			otherShelfMap[productShelf.ProductId] += fmt.Sprintf("%d,", productShelf.ShelfId)
 		}
-		productShelfMap[productShelf.ShelfId] = append(productShelfMap[productShelf.ProductId], &productShelf)
+
 	}
+	otherShelfMap
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error in rows: %v", err)
 	}
 
-	return productShelfMap, nil
-}
-func GetProduct(db *sqlx.DB, ids string) (map[int]*models.Product, error) {
 	productMap := make(map[int]*models.Product)
 	query := `SELECT * FROM products  WHERE product_id IN (` + ids + `)`
 
@@ -85,10 +86,6 @@ func GetProduct(db *sqlx.DB, ids string) (map[int]*models.Product, error) {
 		return nil, fmt.Errorf("error in rows: %v", err)
 	}
 
-	return productMap, nil
-}
-
-func GetShelves(db *sqlx.DB, ids string) (map[int]*models.Shelves, error) {
 	shelvesMap := make(map[int]*models.Shelves)
 	query := `SELECT * FROM shelves  WHERE shelves.shelf_id IN (` + ids + `)`
 
@@ -109,6 +106,19 @@ func GetShelves(db *sqlx.DB, ids string) (map[int]*models.Shelves, error) {
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error in rows: %v", err)
 	}
+	return orderMap, nil
+}
+
+func GetProductShelf(db *sqlx.DB, ids string) (map[int][]*models.ProductShelf, error) {
+
+	return productShelfMap, nil
+}
+func GetProduct(db *sqlx.DB, ids string) (map[int]*models.Product, error) {
+
+	return productMap, nil
+}
+
+func GetShelves(db *sqlx.DB, ids string) (map[int]*models.Shelves, error) {
 
 	return shelvesMap, nil
 }
